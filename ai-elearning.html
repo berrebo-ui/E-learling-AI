@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Leren · Prompting Meesterschap</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c26;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6a9b;
+    --accent3: #6affda;
+    --text: #e8e8f0;
+    --muted: #7a7a9a;
+    --success: #4cff91;
+    --warning: #ffb84c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCREEN MANAGER ── */
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ── WELCOME SCREEN ── */
+  #welcome {
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,255,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,255,.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    animation: gridDrift 20s linear infinite;
+  }
+  @keyframes gridDrift { from { transform: translate(0,0); } to { transform: translate(48px,48px); } }
+  .orb {
+    position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none;
+  }
+  .orb1 { width: 500px; height: 500px; background: rgba(124,106,255,.18); top: -150px; right: -100px; animation: float1 8s ease-in-out infinite; }
+  .orb2 { width: 350px; height: 350px; background: rgba(106,255,218,.12); bottom: -80px; left: -80px; animation: float2 10s ease-in-out infinite; }
+  @keyframes float1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,40px)} }
+  @keyframes float2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,-30px)} }
+  .welcome-inner {
+    position: relative; z-index: 2; text-align: center; max-width: 680px; padding: 40px 24px;
+    animation: fadeUp .8s ease both;
+  }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(32px)} to{opacity:1;transform:none} }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(124,106,255,.15); border: 1px solid rgba(124,106,255,.35);
+    border-radius: 100px; padding: 6px 16px; font-size: 13px; color: var(--accent);
+    font-weight: 500; margin-bottom: 28px; letter-spacing: .02em;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  h1 {
+    font-family: 'Syne', sans-serif; font-size: clamp(38px,7vw,72px);
+    font-weight: 800; line-height: 1.05; margin-bottom: 20px;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+  .subtitle { font-size: 18px; color: var(--muted); line-height: 1.7; margin-bottom: 40px; font-weight: 300; }
+  .welcome-stats {
+    display: flex; gap: 32px; justify-content: center; margin-bottom: 48px; flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat-num { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; color: var(--accent3); }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .btn-start {
+    background: var(--accent); color: #fff; border: none; border-radius: 14px;
+    padding: 18px 48px; font-size: 17px; font-weight: 600; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .25s; position: relative; overflow: hidden;
+  }
+  .btn-start::before {
+    content:''; position: absolute; inset: 0;
+    background: linear-gradient(135deg,rgba(255,255,255,.15),transparent);
+    opacity: 0; transition: opacity .25s;
+  }
+  .btn-start:hover { transform: translateY(-3px); box-shadow: 0 20px 50px rgba(124,106,255,.45); }
+  .btn-start:hover::before { opacity: 1; }
+
+  /* ── MAIN APP ── */
+  #app { flex-direction: row; }
+  .sidebar {
+    width: 280px; min-height: 100vh; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 32px 20px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; margin-bottom: 40px; }
+  .logo span { color: var(--accent); }
+  .progress-track {
+    background: var(--surface2); border-radius: 10px; padding: 16px;
+    margin-bottom: 32px;
+  }
+  .progress-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1);
+    width: 0%;
+  }
+  .progress-pct { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; color: var(--accent); margin-top: 8px; }
+  .nav-section { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; margin-top: 24px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    border-radius: 10px; cursor: pointer; transition: all .2s; margin-bottom: 4px;
+    font-size: 14px; font-weight: 500; color: var(--muted); border: 1px solid transparent;
+    position: relative;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(124,106,255,.12); color: var(--accent); border-color: rgba(124,106,255,.25); }
+  .nav-item.done { color: var(--success); }
+  .nav-item.done .nav-icon { color: var(--success); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-check { margin-left: auto; font-size: 13px; color: var(--success); }
+  .lock-icon { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .nav-item.locked { opacity: .45; cursor: not-allowed; pointer-events: none; }
+
+  /* ── CONTENT ── */
+  .content { flex: 1; overflow-y: auto; }
+  .module { display: none; padding: 48px 56px; max-width: 860px; animation: fadeUp .4s ease both; }
+  .module.active { display: block; }
+  .module-tag {
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent);
+    font-weight: 600; margin-bottom: 12px;
+  }
+  h2 { font-family: 'Syne', sans-serif; font-size: clamp(28px,4vw,42px); font-weight: 800; line-height: 1.15; margin-bottom: 16px; }
+  .module-intro { font-size: 17px; color: var(--muted); line-height: 1.8; margin-bottom: 40px; font-weight: 300; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px; margin-bottom: 20px; transition: border-color .2s;
+  }
+  .card:hover { border-color: rgba(124,106,255,.35); }
+  .card h3 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+  .card p { color: var(--muted); line-height: 1.75; font-size: 15px; }
+  .highlight-box {
+    background: rgba(124,106,255,.08); border: 1px solid rgba(124,106,255,.25);
+    border-radius: 14px; padding: 24px 28px; margin: 28px 0;
+  }
+  .highlight-box .hb-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  .highlight-box p { font-size: 15px; line-height: 1.75; color: var(--text); }
+  .tip-box {
+    background: rgba(106,255,218,.06); border: 1px solid rgba(106,255,218,.2);
+    border-radius: 14px; padding: 20px 24px; margin: 24px 0; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .tip-icon { font-size: 20px; }
+  .tip-box p { font-size: 14px; line-height: 1.7; color: var(--muted); }
+  .tip-box strong { color: var(--accent3); }
+
+  /* ── PROMPT COMPARE ── */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+  .compare-card { border-radius: 14px; padding: 20px; }
+  .compare-card.bad { background: rgba(255,80,80,.06); border: 1px solid rgba(255,80,80,.2); }
+  .compare-card.good { background: rgba(76,255,145,.06); border: 1px solid rgba(76,255,145,.2); }
+  .compare-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; }
+  .compare-card.bad .compare-label { color: #ff5050; }
+  .compare-card.good .compare-label { color: var(--success); }
+  .compare-prompt {
+    font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.65;
+    padding: 14px 16px; border-radius: 10px; font-style: italic;
+  }
+  .compare-card.bad .compare-prompt { background: rgba(255,80,80,.08); color: #ffaaaa; }
+  .compare-card.good .compare-prompt { background: rgba(76,255,145,.08); color: #aaffcc; }
+  .compare-why { font-size: 13px; color: var(--muted); margin-top: 12px; line-height: 1.6; }
+
+  /* ── FORMULA BUILDER ── */
+  .formula {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 28px 0;
+    background: var(--surface2); border-radius: 16px; padding: 24px;
+  }
+  .formula-part {
+    padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    font-family: 'Syne', sans-serif;
+  }
+  .f-role { background: rgba(124,106,255,.2); color: var(--accent); border: 1px solid rgba(124,106,255,.3); }
+  .f-taak { background: rgba(106,255,218,.15); color: var(--accent3); border: 1px solid rgba(106,255,218,.3); }
+  .f-context { background: rgba(255,106,155,.15); color: var(--accent2); border: 1px solid rgba(255,106,155,.3); }
+  .f-format { background: rgba(255,184,76,.15); color: var(--warning); border: 1px solid rgba(255,184,76,.3); }
+  .f-plus { color: var(--muted); font-size: 20px; font-weight: 300; }
+
+  /* ── INTERACTIVE PROMPT BUILDER ── */
+  .builder-wrap { background: var(--surface2); border-radius: 16px; padding: 28px; margin: 28px 0; }
+  .builder-wrap h3 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 20px; color: var(--accent3); }
+  .builder-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .field-group label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; font-weight: 600; }
+  .field-group input, .field-group select, .field-group textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 14px; transition: border-color .2s; resize: none;
+  }
+  .field-group input:focus, .field-group select:focus, .field-group textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .field-group select option { background: var(--surface); }
+  .full-width { grid-column: 1 / -1; }
+  .output-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; min-height: 100px; font-size: 14px; line-height: 1.75;
+    color: var(--accent3); font-style: italic; transition: all .3s;
+  }
+  .output-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; font-weight: 600; }
+  .btn-build {
+    background: var(--accent3); color: #0a0a0f; border: none; border-radius: 10px;
+    padding: 12px 24px; font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; margin-bottom: 16px; transition: all .2s;
+  }
+  .btn-build:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(106,255,218,.3); }
+
+  /* ── QUIZ ── */
+  .quiz-wrap { margin: 28px 0; }
+  .quiz-question { font-size: 18px; font-weight: 500; margin-bottom: 24px; line-height: 1.55; }
+  .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+  .quiz-opt {
+    background: var(--surface2); border: 2px solid var(--border);
+    border-radius: 12px; padding: 16px 20px; cursor: pointer; transition: all .2s;
+    font-size: 15px; line-height: 1.5; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .quiz-opt:hover { border-color: rgba(124,106,255,.5); background: rgba(124,106,255,.06); }
+  .quiz-opt.correct { border-color: var(--success); background: rgba(76,255,145,.07); color: var(--success); }
+  .quiz-opt.wrong { border-color: #ff5050; background: rgba(255,80,80,.07); color: #ff9090; }
+  .quiz-opt.disabled { pointer-events: none; }
+  .opt-letter {
+    width: 24px; height: 24px; border-radius: 6px; background: var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    font-weight: 700; flex-shrink: 0; margin-top: 1px;
+  }
+  .quiz-feedback {
+    margin-top: 20px; padding: 18px 22px; border-radius: 12px; font-size: 15px; line-height: 1.65;
+    display: none;
+  }
+  .quiz-feedback.show { display: block; animation: fadeUp .3s ease; }
+  .quiz-feedback.correct-fb { background: rgba(76,255,145,.08); border: 1px solid rgba(76,255,145,.25); color: var(--success); }
+  .quiz-feedback.wrong-fb { background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.2); color: #ff9090; }
+  .quiz-next {
+    margin-top: 20px; display: none; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; padding: 14px 28px; font-size: 15px;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .2s;
+  }
+  .quiz-next.show { display: inline-flex; }
+  .quiz-next:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(124,106,255,.4); }
+
+  /* ── MODULE NAV ── */
+  .module-nav { display: flex; justify-content: space-between; margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--border); }
+  .btn-nav {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    border-radius: 12px; padding: 14px 28px; font-size: 15px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .2s; display: flex; gap: 8px; align-items: center;
+  }
+  .btn-nav:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-nav.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-nav.primary:hover { box-shadow: 0 10px 30px rgba(124,106,255,.4); color: #fff; }
+
+  /* ── SCENARIO CARDS ── */
+  .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+  .scenario-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px; cursor: pointer; transition: all .25s; position: relative; overflow: hidden;
+  }
+  .scenario-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transform: scaleX(0); transform-origin: left; transition: transform .3s;
+  }
+  .scenario-card:hover::before { transform: scaleX(1); }
+  .scenario-card:hover { border-color: rgba(124,106,255,.3); transform: translateY(-3px); }
+  .scenario-emoji { font-size: 28px; margin-bottom: 12px; }
+  .scenario-card h4 { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .scenario-card p { font-size: 13px; color: var(--muted); line-height: 1.65; }
+  .scenario-detail { display: none; background: var(--surface); border: 1px solid rgba(124,106,255,.25); border-radius: 14px; padding: 24px; margin: 16px 0; animation: fadeUp .3s ease; }
+  .scenario-detail.show { display: block; }
+  .scenario-detail .prompt-example { background: var(--surface2); border-radius: 10px; padding: 16px; margin: 14px 0; font-size: 14px; line-height: 1.75; color: var(--accent3); font-style: italic; border-left: 3px solid var(--accent); }
+
+  /* ── COMPLETION ── */
+  #completion { align-items: center; justify-content: center; text-align: center; }
+  .completion-inner { max-width: 600px; padding: 40px 24px; animation: fadeUp .8s ease; }
+  .trophy { font-size: 80px; margin-bottom: 24px; animation: trophyBounce 1s ease .3s both; }
+  @keyframes trophyBounce { from{opacity:0;transform:scale(.5) translateY(20px)} 60%{transform:scale(1.15)} to{opacity:1;transform:none} }
+  .cert-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 40px; margin: 32px 0; position: relative; overflow: hidden;
+  }
+  .cert-box::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(124,106,255,.06), rgba(106,255,218,.04));
+  }
+  .cert-title { font-family: 'Syne', sans-serif; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+  .cert-name { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--accent); margin-bottom: 8px; }
+  .cert-desc { font-size: 15px; color: var(--muted); line-height: 1.65; }
+  .cert-date { font-size: 13px; color: var(--muted); margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .achievements { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .badge-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+
+  /* ── TAGS ── */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+  .tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 5px 14px; font-size: 12px; color: var(--muted); font-weight: 500; }
+
+  /* ── STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 16px; margin: 24px 0; }
+  .step { display: flex; gap: 18px; align-items: flex-start; }
+  .step-num { width: 36px; height: 36px; border-radius: 10px; background: rgba(124,106,255,.15); border: 1px solid rgba(124,106,255,.3); color: var(--accent); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .step-content h4 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+  .step-content p { font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+  @media(max-width:900px) {
+    .sidebar { width: 240px; padding: 24px 14px; }
+    .module { padding: 32px 24px; }
+    .compare-grid, .builder-fields, .scenario-grid { grid-template-columns: 1fr; }
+  }
+  @media(max-width:640px) {
+    #app { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: static; min-height: auto; }
+    .module { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── WELCOME ── -->
+<div id="welcome" class="screen active">
+  <div class="bg-grid"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="welcome-inner">
+    <div class="badge"><div class="badge-dot"></div> Interactieve E-Learning</div>
+    <h1>Leer AI <em>slim</em><br>te gebruiken</h1>
+    <p class="subtitle">Van totaal beginner tot prompt-expert. Ontdek hoe je AI-tools zoals ChatGPT en Claude optimaal inzet voor jouw werk en leven.</p>
+    <div class="welcome-stats">
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Modules</div></div>
+      <div class="stat"><div class="stat-num">~30</div><div class="stat-label">Minuten</div></div>
+      <div class="stat"><div class="stat-num">15+</div><div class="stat-label">Oefeningen</div></div>
+    </div>
+    <button class="btn-start" onclick="startApp()">Begin de cursus →</button>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app" class="screen">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo">AI<span>Leren</span></div>
+    <div class="progress-track">
+      <div class="progress-label"><span>Voortgang</span><span id="progress-pct-label">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-pct" id="progress-pct">0%</div>
+    </div>
+    <div class="nav-section">Modules</div>
+    <div class="nav-item active" id="nav-0" onclick="goModule(0)">
+      <span class="nav-icon">🧠</span> Wat is AI?
+    </div>
+    <div class="nav-item locked" id="nav-1" onclick="goModule(1)">
+      <span class="nav-icon">💬</span> Hoe praat je met AI?
+      <span class="lock-icon" id="lock-1">🔒</span>
+    </div>
+    <div class="nav-item locked" id="nav-2" onclick="goModule(2)">
+      <span class="nav-icon">🎯</span> De Prompt Formule
+      <span class="lock-icon" id="lock-2">🔒</span>
+    </div>
+    <div class="nav-item locked" id="nav-3" onclick="goModule(3)">
+      <span class="nav-icon">⚡</span> Geavanceerde Technieken
+      <span class="lock-icon" id="lock-3">🔒</span>
+    </div>
+    <div class="nav-item locked" id="nav-4" onclick="goModule(4)">
+      <span class="nav-icon">🚀</span> Toepassen in de Praktijk
+      <span class="lock-icon" id="lock-4">🔒</span>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <main class="content">
+
+    <!-- MODULE 0: Wat is AI? -->
+    <div class="module active" id="module-0">
+      <div class="module-tag">Module 1 / 5</div>
+      <h2>Wat is Kunstmatige Intelligentie?</h2>
+      <p class="module-intro">Voordat we gaan prompting leren, is het goed te begrijpen wat AI eigenlijk is — en wat het <em>niet</em> is. Geen rocket science, beloofd.</p>
+
+      <div class="card">
+        <h3>🤖 AI in één zin</h3>
+        <p>AI (Kunstmatige Intelligentie) is software die geleerd heeft van enorme hoeveelheden tekst om te voorspellen wat een nuttig, logisch antwoord is op jouw vraag. Het denkt niet écht na — het herkent patronen.</p>
+      </div>
+      <div class="card">
+        <h3>📚 Hoe is het getraind?</h3>
+        <p>AI-modellen zoals ChatGPT, Claude en Gemini zijn getraind op miljarden pagina's tekst: boeken, artikelen, websites, code en meer. Ze leerden welke woorden en zinnen logisch op elkaar volgen.</p>
+      </div>
+      <div class="card">
+        <h3>💡 Een handige metafoor</h3>
+        <p>Zie AI als een extreem belezen assistent die alle boeken heeft gelezen maar geen eigen ervaringen heeft. Ze kan je helpen denken, schrijven en redeneren — maar heeft jouw sturing nodig.</p>
+      </div>
+
+      <div class="highlight-box">
+        <div class="hb-label">📌 Onthoud dit</div>
+        <p>AI is zo goed als de instructies die jij geeft. Vage vragen → vage antwoorden. Duidelijke, gedetailleerde vragen → nuttige, specifieke antwoorden. Dát is de kern van prompting.</p>
+      </div>
+
+      <div class="tags">
+        <span class="tag">LLM</span><span class="tag">ChatGPT</span><span class="tag">Claude</span><span class="tag">Gemini</span><span class="tag">Patroonherkenning</span>
+      </div>
+
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px;margin-top:36px;">🧪 Snelle Kennischeck</h3>
+      <div class="quiz-wrap" id="quiz-0">
+        <div class="quiz-question">Hoe werkt een AI-taalmodel zoals ChatGPT?</div>
+        <div class="quiz-options">
+          <div class="quiz-opt" onclick="answerQuiz(0,'A','B')">
+            <div class="opt-letter">A</div>
+            Het heeft een menselijk brein in een computer
+          </div>
+          <div class="quiz-opt" onclick="answerQuiz(0,'B','B')">
+            <div class="opt-letter">B</div>
+            Het voorspelt het meest logische antwoord op basis van geleerde patronen
+          </div>
+          <div class="quiz-opt" onclick="answerQuiz(0,'C','B')">
+            <div class="opt-letter">C</div>
+            Het zoekt het antwoord op in Wikipedia
+          </div>
+          <div class="quiz-opt" onclick="answerQuiz(0,'D','B')">
+            <div class="opt-letter">D</div>
+            Het raadt altijd een willekeurig antwoord
+          </div>
+        </div>
+        <div class="quiz-feedback" id="feedback-0"></div>
+        <button class="quiz-next" id="next-0" onclick="completeModule(0)">Volgende module →</button>
+      </div>
+
+      <div class="module-nav">
+        <div></div>
+        <button class="btn-nav primary" onclick="completeAndGoNext(0)" id="skip-0">Sla quiz over & ga door →</button>
+      </div>
+    </div>
+
+    <!-- MODULE 1: Hoe praat je met AI -->
+    <div class="module" id="module-1">
+      <div class="module-tag">Module 2 / 5</div>
+      <h2>Hoe praat je effectief met AI?</h2>
+      <p class="module-intro">De manier waarop je een vraag stelt, bepaalt volledig de kwaliteit van het antwoord. Hier leer je de basisprincipes van goede communicatie met AI.</p>
+
+      <div class="card">
+        <h3>❌ vs ✅ Slecht vs Goed</h3>
+        <p>Zie hieronder het verschil tussen een vage en een specifieke prompt.</p>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-card bad">
+          <div class="compare-label">❌ Slecht</div>
+          <div class="compare-prompt">"Schrijf iets over marketing."</div>
+          <div class="compare-why">Te vaag. AI weet niet: welk product? welke doelgroep? welk formaat? welke toon?</div>
+        </div>
+        <div class="compare-card good">
+          <div class="compare-label">✅ Goed</div>
+          <div class="compare-prompt">"Schrijf een korte LinkedIn-post van 150 woorden over het belang van klantfeedback, gericht op marketingmanagers. Gebruik een professionele maar vriendelijke toon."</div>
+          <div class="compare-why">Specifiek doel, formaat, doelgroep en toon → AI begrijpt precies wat je wil.</div>
+        </div>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-card bad">
+          <div class="compare-label">❌ Slecht</div>
+          <div class="compare-prompt">"Leg machine learning uit."</div>
+          <div class="compare-why">Wie is de doelgroep? Een kind? Een ingenieur? Het antwoord zal te algemeen zijn.</div>
+        </div>
+        <div class="compare-card good">
+          <div class="compare-label">✅ Goed</div>
+          <div class="compare-prompt">"Leg machine learning uit aan iemand die nooit met technologie heeft gewerkt. Gebruik een analogie met koken en maximaal 5 zinnen."</div>
+          <div class="compare-why">Doelgroep, analogie-vereiste en lengtebegrenzing zorgen voor een perfect afgestemd antwoord.</div>
+        </div>
+      </div>
+
+      <div class="tip-box">
+        <div class="tip-icon">💡</div>
+        <p><strong>Gouden Regel:</strong> Als je zelf niet weet wat je precies wilt, weet AI het ook niet. Neem even de tijd om je vraag te verfijnen voor je verzendt.</p>
+      </div>
+
+      <div class="card">
+        <h3>🔄 Het is een gesprek, geen zoekmachine</h3>
+        <p>Je hoeft niet alles in één prompt te stoppen. Bouw het gesprek op: stel een vraag, bekijk het antwoord, verfijn daarna. AI onthoudt de context van jullie gesprek.</p>
+      </div>
+
+      <div class="card">
+        <h3>📋 Geef altijd context mee</h3>
+        <p>Wie ben jij? Wat is het doel? Voor wie? In welke situatie? Hoe meer relevante context je geeft, hoe beter het antwoord. AI kan niet raden wat jij al weet.</p>
+      </div>
+
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px;margin-top:36px;">🧪 Kennischeck</h3>
+      <div class="quiz-wrap" id="quiz-1">
+        <div class="quiz-question">Welke prompt zal het beste resultaat opleveren?</div>
+        <div class="quiz-options">
+          <div class="quiz-opt" onclick="answerQuiz(1,'A','C')"><div class="opt-letter">A</div>"Help me met een e-mail."</div>
+          <div class="quiz-opt" onclick="answerQuiz(1,'B','C')"><div class="opt-letter">B</div>"Schrijf een e-mail over mijn vergadering."</div>
+          <div class="quiz-opt" onclick="answerQuiz(1,'C','C')"><div class="opt-letter">C</div>"Schrijf een professionele e-mail aan een klant om een vergadering te verzetten van dinsdag naar vrijdag. Toon: formeel maar vriendelijk. Lengte: max 100 woorden."</div>
+          <div class="quiz-opt" onclick="answerQuiz(1,'D','C')"><div class="opt-letter">D</div>"E-mail vergadering verzetten."</div>
+        </div>
+        <div class="quiz-feedback" id="feedback-1"></div>
+        <button class="quiz-next" id="next-1" onclick="completeModule(1)">Volgende module →</button>
+      </div>
+
+      <div class="module-nav">
+        <button class="btn-nav" onclick="goModule(0)">← Vorige</button>
+        <button class="btn-nav primary" onclick="completeAndGoNext(1)">Sla quiz over & ga door →</button>
+      </div>
+    </div>
+
+    <!-- MODULE 2: De Prompt Formule -->
+    <div class="module" id="module-2">
+      <div class="module-tag">Module 3 / 5</div>
+      <h2>De Prompt Formule</h2>
+      <p class="module-intro">De beste prompts volgen een duidelijke structuur. Leer de formule die professionals gebruiken om altijd sterke resultaten te krijgen.</p>
+
+      <div class="highlight-box">
+        <div class="hb-label">🎯 De RTCF-Formule</div>
+        <p>Een goede prompt bestaat uit vier bouwstenen: <strong>Rol</strong> + <strong>Taak</strong> + <strong>Context</strong> + <strong>Formaat</strong>. Je hoeft niet altijd alle vier te gebruiken, maar hoe meer, hoe beter.</p>
+      </div>
+
+      <div class="formula">
+        <div class="formula-part f-role">🎭 Rol</div>
+        <div class="f-plus">+</div>
+        <div class="formula-part f-taak">📝 Taak</div>
+        <div class="f-plus">+</div>
+        <div class="formula-part f-context">🌍 Context</div>
+        <div class="f-plus">+</div>
+        <div class="formula-part f-format">📐 Formaat</div>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">R</div>
+          <div class="step-content">
+            <h4>Rol — Geef AI een persona</h4>
+            <p>"Jij bent een ervaren copywriter..." of "Jij bent een vriendelijke leraar die uitlegt aan kinderen..." — Door een rol te geven, past AI zijn stijl en kennisdiepte aan.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">T</div>
+          <div class="step-content">
+            <h4>Taak — Wat moet er precies gebeuren?</h4>
+            <p>"Schrijf een e-mail", "Maak een samenvatting van", "Bedenk 10 ideeën voor" — Wees zo specifiek mogelijk over WAT je wil.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">C</div>
+          <div class="step-content">
+            <h4>Context — Geef de achtergrond</h4>
+            <p>Voor wie? In welke situatie? Wat is het doel? Welke beperkingen zijn er? Context helpt AI de juiste keuzes te maken.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">F</div>
+          <div class="step-content">
+            <h4>Formaat — Hoe moet het eruit zien?</h4>
+            <p>Bullet points, tabel, maximaal 200 woorden, markdown, formele toon, opsomming... Door het formaat te specificeren krijg je precies wat je nodig hebt.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>✨ Voorbeeld van RTCF in actie</h3>
+        <p style="color:var(--accent3);font-style:italic;margin-top:10px;line-height:1.8;">"Jij bent een HR-manager met 10 jaar ervaring <span style='color:var(--accent)'>[ROL]</span>. Schrijf een functieprofiel voor een junior marketeer <span style='color:var(--accent3)'>[TAAK]</span>. Het bedrijf is een scale-up in de foodtech-sector met een informele cultuur <span style='color:var(--accent2)'>[CONTEXT]</span>. Gebruik bullet points, max 300 woorden, in zakelijke maar toegankelijke taal <span style='color:var(--warning)'>[FORMAAT]</span>."</p>
+      </div>
+
+      <!-- Interactieve Prompt Builder -->
+      <div class="builder-wrap">
+        <h3>🔧 Bouw Jouw Eigen Prompt</h3>
+        <div class="builder-fields">
+          <div class="field-group">
+            <label>Rol (wie is AI?)</label>
+            <input type="text" id="b-rol" placeholder="bijv. een ervaren marketeer" oninput="buildPrompt()">
+          </div>
+          <div class="field-group">
+            <label>Taak (wat moet er?)</label>
+            <input type="text" id="b-taak" placeholder="bijv. schrijf een LinkedIn-post" oninput="buildPrompt()">
+          </div>
+          <div class="field-group full-width">
+            <label>Context (achtergrond)</label>
+            <textarea id="b-context" rows="2" placeholder="bijv. voor een B2B softwarebedrijf gericht op accountants" oninput="buildPrompt()"></textarea>
+          </div>
+          <div class="field-group">
+            <label>Toon</label>
+            <select id="b-toon" onchange="buildPrompt()">
+              <option value="">Kies een toon...</option>
+              <option>professioneel en formeel</option>
+              <option>vriendelijk en informeel</option>
+              <option>enthousiast en energiek</option>
+              <option>rustig en informatief</option>
+              <option>humoristisch en luchtig</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Formaat / Lengte</label>
+            <input type="text" id="b-format" placeholder="bijv. max 150 woorden, bullet points" oninput="buildPrompt()">
+          </div>
+        </div>
+        <div class="output-label">Jouw gegenereerde prompt:</div>
+        <div class="output-box" id="b-output">Vul de velden hierboven in om jouw prompt te bouwen...</div>
+      </div>
+
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px;margin-top:36px;">🧪 Kennischeck</h3>
+      <div class="quiz-wrap" id="quiz-2">
+        <div class="quiz-question">Welk onderdeel ontbreekt in deze prompt?<br><em style="color:var(--muted);font-size:15px;">"Schrijf een samenvatting van dit rapport voor het management."</em></div>
+        <div class="quiz-options">
+          <div class="quiz-opt" onclick="answerQuiz(2,'A','D')"><div class="opt-letter">A</div>De taak — het is niet duidelijk wat er moet gebeuren</div>
+          <div class="quiz-opt" onclick="answerQuiz(2,'B','D')"><div class="opt-letter">B</div>De doelgroep — management is al vermeld</div>
+          <div class="quiz-opt" onclick="answerQuiz(2,'C','D')"><div class="opt-letter">C</div>Er ontbreekt niets, dit is een prima prompt</div>
+          <div class="quiz-opt" onclick="answerQuiz(2,'D','D')"><div class="opt-letter">D</div>Rol en formaat — wie is AI? En hoe lang/welk formaat?</div>
+        </div>
+        <div class="quiz-feedback" id="feedback-2"></div>
+        <button class="quiz-next" id="next-2" onclick="completeModule(2)">Volgende module →</button>
+      </div>
+
+      <div class="module-nav">
+        <button class="btn-nav" onclick="goModule(1)">← Vorige</button>
+        <button class="btn-nav primary" onclick="completeAndGoNext(2)">Sla quiz over & ga door →</button>
+      </div>
+    </div>
+
+    <!-- MODULE 3: Geavanceerde Technieken -->
+    <div class="module" id="module-3">
+      <div class="module-tag">Module 4 / 5</div>
+      <h2>Geavanceerde Prompting Technieken</h2>
+      <p class="module-intro">Klaar voor het next level? Deze technieken gebruiken professionals om AI echt te laten schitteren.</p>
+
+      <div class="card">
+        <h3>🪜 Chain-of-Thought (Stap voor stap)</h3>
+        <p>Vraag AI om zijn redenering te tonen door toe te voegen: <strong style="color:var(--accent3)">"Denk stap voor stap na"</strong> of <strong style="color:var(--accent3)">"Laat je redenering zien"</strong>. Dit verbetert de kwaliteit van complexe antwoorden enorm.</p>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-card bad">
+          <div class="compare-label">❌ Zonder techniek</div>
+          <div class="compare-prompt">"Wat is de beste marketingstrategie voor mijn app?"</div>
+        </div>
+        <div class="compare-card good">
+          <div class="compare-label">✅ Met Chain-of-Thought</div>
+          <div class="compare-prompt">"Analyseer stap voor stap welke marketingstrategie het beste is voor een fitness-app die gericht is op 30-45 jarigen. Begin met de doelgroepanalyse, daarna kanalen, dan budget-verdeling."</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🎭 Few-Shot Prompting (Voorbeelden geven)</h3>
+        <p>Laat AI zien <em>wat je bedoelt</em> door voorbeelden van input en gewenste output te geven. AI leert dan het patroon en past het toe op nieuwe gevallen.</p>
+      </div>
+
+      <div class="highlight-box">
+        <div class="hb-label">💡 Voorbeeld: Few-Shot</div>
+        <p>"Herschrijf de volgende zinnen formeler:<br><br>Informeel: 'Hey, kun je dat even nakijken?'<br>Formeel: 'Zou u dat ter controle willen doornemen?'<br><br>Informeel: 'Die meeting was echt zonde van de tijd.'<br>Formeel: 'De vergadering was helaas weinig productief.'<br><br>Nu jij: 'We moeten echt snel een beslissing nemen.'"</p>
+      </div>
+
+      <div class="card">
+        <h3>♻️ Iteratief Verfijnen</h3>
+        <p>Gebruik het antwoord als startpunt voor je volgende prompt. "Maak dit korter", "Zet dit om naar een tabel", "Voeg een sterkere call-to-action toe", "Herschrijf voor een jongere doelgroep".</p>
+      </div>
+
+      <div class="card">
+        <h3>🚫 Negatieve Instructies</h3>
+        <p>Zeg ook WAT je <em>niet</em> wil. "Gebruik geen jargon", "Vermijd bullet points", "Schrijf niet in passieve zin", "Neem geen aanbevelingen op". Dit geeft AI duidelijke grenzen.</p>
+      </div>
+
+      <div class="tip-box">
+        <div class="tip-icon">⚡</div>
+        <p><strong>Pro-tip:</strong> Start een nieuwe chat voor een nieuw onderwerp. AI-modellen kunnen verward raken als je context wisselt binnen hetzelfde gesprek. Schone lei = betere resultaten.</p>
+      </div>
+
+      <div class="card">
+        <h3>📄 Documenten & Tekst Meegeven</h3>
+        <p>Plak tekst, rapporten of e-mails direct in je prompt en geef instructies over wat AI daarmee moet doen. "Hier is een klantenmail [tekst]. Schrijf een professioneel antwoord dat het probleem erkent en een oplossing biedt."</p>
+      </div>
+
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px;margin-top:36px;">🧪 Kennischeck</h3>
+      <div class="quiz-wrap" id="quiz-3">
+        <div class="quiz-question">Wat is het doel van "Chain-of-Thought" prompting?</div>
+        <div class="quiz-options">
+          <div class="quiz-opt" onclick="answerQuiz(3,'A','B')"><div class="opt-letter">A</div>Om meerdere vragen tegelijk te stellen</div>
+          <div class="quiz-opt" onclick="answerQuiz(3,'B','B')"><div class="opt-letter">B</div>AI te laten redeneren in stappen voor complexere, betere antwoorden</div>
+          <div class="quiz-opt" onclick="answerQuiz(3,'C','B')"><div class="opt-letter">C</div>Het gesprek te beperken tot één topic</div>
+          <div class="quiz-opt" onclick="answerQuiz(3,'D','B')"><div class="opt-letter">D</div>AI sneller te laten antwoorden</div>
+        </div>
+        <div class="quiz-feedback" id="feedback-3"></div>
+        <button class="quiz-next" id="next-3" onclick="completeModule(3)">Volgende module →</button>
+      </div>
+
+      <div class="module-nav">
+        <button class="btn-nav" onclick="goModule(2)">← Vorige</button>
+        <button class="btn-nav primary" onclick="completeAndGoNext(3)">Sla quiz over & ga door →</button>
+      </div>
+    </div>
+
+    <!-- MODULE 4: Praktijk -->
+    <div class="module" id="module-4">
+      <div class="module-tag">Module 5 / 5</div>
+      <h2>AI Toepassen in de Praktijk</h2>
+      <p class="module-intro">Genoeg theorie — laten we kijken hoe je AI kunt inzetten in echte situaties. Klik op een scenario om een voorbeeldprompt te zien.</p>
+
+      <div class="scenario-grid">
+        <div class="scenario-card" onclick="showScenario('werk')">
+          <div class="scenario-emoji">💼</div>
+          <h4>Op het werk</h4>
+          <p>E-mails, rapporten, vergadernotities, presentaties en meer</p>
+        </div>
+        <div class="scenario-card" onclick="showScenario('leren')">
+          <div class="scenario-emoji">📚</div>
+          <h4>Leren & Studeren</h4>
+          <p>Moeilijke concepten begrijpen, samenvattingen, oefenvragen</p>
+        </div>
+        <div class="scenario-card" onclick="showScenario('creatief')">
+          <div class="scenario-emoji">✍️</div>
+          <h4>Creatief Schrijven</h4>
+          <p>Blogs, social media, verhalen, slogans en campagnes</p>
+        </div>
+        <div class="scenario-card" onclick="showScenario('data')">
+          <div class="scenario-emoji">📊</div>
+          <h4>Data & Analyse</h4>
+          <p>Inzichten halen, vergelijken, trends beschrijven</p>
+        </div>
+      </div>
+
+      <div class="scenario-detail" id="scenario-werk">
+        <h4 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px;">💼 Werkprompts</h4>
+        <p style="color:var(--muted);font-size:14px;">Voorbeeldprompts die direct inzetbaar zijn:</p>
+        <div class="prompt-example">"Jij bent een professionele business writer. Schrijf een samenvatting van de volgende vergadernotities in maximaal 5 bullet points, gericht op het management. Notities: [plak hier jouw tekst]."</div>
+        <div class="prompt-example">"Herschrijf deze e-mail formeler en verwijder alle excuses. Origineel: [plak hier de e-mail]. Toon: zelfverzekerd maar respectvol."</div>
+        <div class="prompt-example">"Maak een agenda voor een 45-minuten kickoff-vergadering met een nieuw projectteam. Zorg voor ijsbrekervragen, projectintroductie, rolverdeling en Q&A."</div>
+      </div>
+      <div class="scenario-detail" id="scenario-leren">
+        <h4 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px;">📚 Leerprompts</h4>
+        <div class="prompt-example">"Jij bent een geduldige leraar. Leg het concept 'inflatie' uit aan iemand die geen economieachtergrond heeft. Gebruik een alledaagse analogie en maximaal 5 zinnen."</div>
+        <div class="prompt-example">"Maak 5 meerkeuzevragen over de Franse Revolutie op niveau middelbare school. Geef na elke vraag de correcte antwoorden en een korte uitleg."</div>
+        <div class="prompt-example">"Ik begrijp [concept] niet goed. Leg het uit op drie niveaus: voor een 10-jarige, een student, en een expert."</div>
+      </div>
+      <div class="scenario-detail" id="scenario-creatief">
+        <h4 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px;">✍️ Creatieve Prompts</h4>
+        <div class="prompt-example">"Schrijf 5 pakkende LinkedIn-openingszinnen die niet starten met 'Ik', gericht op HR-professionals. Thema: remote work culture. Toon: authentiek en verhalend."</div>
+        <div class="prompt-example">"Jij bent een copywriter voor een duurzaam koffiemerk. Bedenk 10 slogan-opties die inspelen op bewust consumeren, zonder de woorden 'groen', 'duurzaam' of 'eco' te gebruiken."</div>
+        <div class="prompt-example">"Schrijf een korte blogintro (max 80 woorden) over [onderwerp] die de lezer meteen wil doen doorlezen. Gebruik een verrassende openingszin."</div>
+      </div>
+      <div class="scenario-detail" id="scenario-data">
+        <h4 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px;">📊 Data Prompts</h4>
+        <div class="prompt-example">"Hier zijn mijn verkoopscijfers voor Q1-Q3: [data]. Beschrijf in 3 bullet points de meest opvallende trends en geef één aanbeveling voor Q4."</div>
+        <div class="prompt-example">"Vergelijk de voor- en nadelen van [optie A] versus [optie B] in een duidelijke tabel met de criteria: kosten, gebruiksgemak, schaalbaarheid en support."</div>
+        <div class="prompt-example">"Ik heb feedback ontvangen van 50 klanten [plak hier]. Categoriseer de feedback in maximaal 5 thema's en rangschik ze op frequentie."</div>
+      </div>
+
+      <div class="tip-box" style="margin-top:32px;">
+        <div class="tip-icon">🌟</div>
+        <p><strong>Laatste tip:</strong> Sla goede prompts op! Maak een persoonlijk "promptbibliotheek" document waar je je best werkende prompts bewaart voor hergebruik.</p>
+      </div>
+
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px;margin-top:36px;">🏆 Afsluitende Quiz</h3>
+      <div class="quiz-wrap" id="quiz-4">
+        <div class="quiz-question">Je wil AI gebruiken om een klachtenbrief te beantwoorden. Welke aanpak is het meest effectief?</div>
+        <div class="quiz-options">
+          <div class="quiz-opt" onclick="answerQuiz(4,'A','C')"><div class="opt-letter">A</div>"Schrijf een antwoord op een klacht."</div>
+          <div class="quiz-opt" onclick="answerQuiz(4,'B','C')"><div class="opt-letter">B</div>"Hier is een klacht. Beantwoord het."</div>
+          <div class="quiz-opt" onclick="answerQuiz(4,'C','C')"><div class="opt-letter">C</div>"Jij bent een klantenservicemedewerker bij een bol.com. Schrijf een empathisch antwoord op de volgende klacht [tekst]. Erken het probleem, bied een oplossing, en sluit af met een gebaar van goede wil. Max 150 woorden, professionele toon."</div>
+          <div class="quiz-opt" onclick="answerQuiz(4,'D','C')"><div class="opt-letter">D</div>"Schrijf een formele reactie op mijn klant."</div>
+        </div>
+        <div class="quiz-feedback" id="feedback-4"></div>
+        <button class="quiz-next" id="next-4" onclick="finishCourse()">🏆 Cursus Afronden →</button>
+      </div>
+
+      <div class="module-nav">
+        <button class="btn-nav" onclick="goModule(3)">← Vorige</button>
+        <button class="btn-nav primary" onclick="finishCourse()">Cursus Afronden 🏆</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── COMPLETION ── -->
+<div id="completion" class="screen">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="completion-inner">
+    <div class="trophy">🏆</div>
+    <h2>Gefeliciteerd!</h2>
+    <p class="subtitle">Je hebt de cursus <strong>AI Leren: Prompting Meesterschap</strong> voltooid. Je bent nu klaar om AI écht effectief in te zetten.</p>
+
+    <div class="cert-box">
+      <div class="cert-title">Certificaat van Voltooiing</div>
+      <div class="cert-name">AI Prompting Expert</div>
+      <div class="cert-desc">Dit certificaat bevestigt dat je de basisprincipes en geavanceerde technieken van effectief AI-gebruik en prompt engineering hebt beheerst.</div>
+      <div class="cert-date" id="cert-date"></div>
+    </div>
+
+    <div class="achievements">
+      <div class="badge-item">🧠 AI-Beginner</div>
+      <div class="badge-item">💬 Communicatie Pro</div>
+      <div class="badge-item">🎯 RTCF Master</div>
+      <div class="badge-item">⚡ Prompt Wizard</div>
+      <div class="badge-item">🚀 Praktijk Expert</div>
+    </div>
+
+    <div style="margin-top:36px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-start" onclick="restartCourse()">↩ Opnieuw Starten</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let modulesDone = new Set();
+  let currentModule = 0;
+  const TOTAL = 5;
+
+  const feedbacks = {
+    0: {
+      correct: "✅ Correct! AI-taalmodellen werken inderdaad door patronen te herkennen en het meest waarschijnlijke antwoord te voorspellen op basis van miljoenen teksten waarop ze getraind zijn.",
+      wrong: "❌ Niet helemaal. AI-modellen werken door patronen te herkennen in de tekst waarop ze getraind zijn, en voorspellen zo het meest logische antwoord. Ze denken niet echt 'na' zoals mensen doen."
+    },
+    1: {
+      correct: "✅ Uitstekend! Optie C is veruit de beste prompt. Ze bevat specifieke informatie over de taak (e-mail verzetten), doelgroep (klant), toon (formeel maar vriendelijk) én een lengtebegrenzing. AI weet precies wat te doen.",
+      wrong: "❌ Dat klopt niet helemaal. De beste prompt is C omdat die de meest specifieke informatie bevat: doelgroep, taak, toon én formaat. Hoe meer relevante details, hoe beter het resultaat."
+    },
+    2: {
+      correct: "✅ Correct! Deze prompt mist een rol (wie is AI?) en een formaat (hoe lang? welke structuur?). Toevoeging: 'Jij bent een business analist. Schrijf een samenvatting van max 200 woorden in bullet points voor het management.' maakt het veel sterker.",
+      wrong: "❌ Niet juist. De prompt mist twee dingen: een rol (wie is AI in dit scenario?) en een formaat (hoe lang? bullet points of tekst?). Dit zijn de R en F uit de RTCF-formule."
+    },
+    3: {
+      correct: "✅ Correct! Chain-of-Thought vraagt AI om stap voor stap te redeneren, wat leidt tot meer doordachte en nauwkeurigere antwoorden bij complexe vragen.",
+      wrong: "❌ Niet correct. Chain-of-Thought gaat over stapsgewijs redeneren — je vraagt AI om zijn denkproces te tonen, wat de kwaliteit van complexe antwoorden significant verbetert."
+    },
+    4: {
+      correct: "✅ Perfect! Optie C is de winnaar. Ze bevat alle elementen: een duidelijke rol, een specifieke taak, relevante context (het bedrijf), instructies voor de toon én een formaat. Dit is professioneel prompting op zijn best!",
+      wrong: "❌ Niet de beste keuze. Optie C is het meest compleet: het bevat een rol, specifieke taak, context (welk bedrijf), gewenste toon EN een formaat. Al die details zorgen voor een veel beter antwoord."
+    }
+  };
+
+  function startApp() {
+    document.getElementById('welcome').classList.remove('active');
+    document.getElementById('app').classList.add('active');
+  }
+
+  function goModule(i) {
+    // Check if locked
+    if (i > 0 && !modulesDone.has(i-1) && !modulesDone.has(i)) return;
+
+    document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('module-'+i).classList.add('active');
+    document.getElementById('nav-'+i).classList.add('active');
+    document.querySelector('.content').scrollTo(0,0);
+    currentModule = i;
+  }
+
+  function unlockModule(i) {
+    const nav = document.getElementById('nav-'+i);
+    if (nav) {
+      nav.classList.remove('locked');
+      const lock = document.getElementById('lock-'+i);
+      if(lock) lock.remove();
+    }
+  }
+
+  function markDone(i) {
+    const nav = document.getElementById('nav-'+i);
+    if (nav && !nav.querySelector('.nav-check')) {
+      nav.classList.add('done');
+      const check = document.createElement('span');
+      check.className = 'nav-check'; check.textContent = '✓';
+      nav.appendChild(check);
+    }
+  }
+
+  function updateProgress() {
+    const pct = Math.round((modulesDone.size / TOTAL) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('progress-pct-label').textContent = pct + '%';
+  }
+
+  function completeModule(i) {
+    modulesDone.add(i);
+    markDone(i);
+    if (i + 1 < TOTAL) unlockModule(i + 1);
+    updateProgress();
+    // Go to next module after short delay
+    setTimeout(() => {
+      if (i + 1 < TOTAL) goModule(i + 1);
+      else finishCourse();
+    }, 500);
+  }
+
+  function completeAndGoNext(i) {
+    modulesDone.add(i);
+    markDone(i);
+    if (i + 1 < TOTAL) unlockModule(i + 1);
+    updateProgress();
+    if (i + 1 < TOTAL) goModule(i + 1);
+    else finishCourse();
+  }
+
+  function answerQuiz(moduleIdx, chosen, correct) {
+    const quiz = document.getElementById('quiz-'+moduleIdx);
+    const opts = quiz.querySelectorAll('.quiz-opt');
+    const letters = ['A','B','C','D'];
+    opts.forEach((opt, i) => {
+      opt.classList.add('disabled');
+      if (letters[i] === correct) opt.classList.add('correct');
+      else if (letters[i] === chosen && chosen !== correct) opt.classList.add('wrong');
+    });
+    const fb = document.getElementById('feedback-'+moduleIdx);
+    fb.classList.add('show');
+    const isCorrect = chosen === correct;
+    fb.classList.add(isCorrect ? 'correct-fb' : 'wrong-fb');
+    fb.textContent = isCorrect ? feedbacks[moduleIdx].correct : feedbacks[moduleIdx].wrong;
+    const nextBtn = document.getElementById('next-'+moduleIdx);
+    nextBtn.classList.add('show');
+  }
+
+  function buildPrompt() {
+    const rol = document.getElementById('b-rol').value.trim();
+    const taak = document.getElementById('b-taak').value.trim();
+    const context = document.getElementById('b-context').value.trim();
+    const toon = document.getElementById('b-toon').value;
+    const format = document.getElementById('b-format').value.trim();
+
+    let prompt = '';
+    if (rol) prompt += `Jij bent ${rol}. `;
+    if (taak) prompt += `${taak.charAt(0).toUpperCase() + taak.slice(1)}. `;
+    if (context) prompt += `Context: ${context}. `;
+    if (toon) prompt += `Gebruik een ${toon} toon. `;
+    if (format) prompt += `Formaat: ${format}.`;
+
+    const out = document.getElementById('b-output');
+    out.textContent = prompt || 'Vul de velden hierboven in om jouw prompt te bouwen...';
+    out.style.color = prompt ? 'var(--accent3)' : 'var(--muted)';
+  }
+
+  let activeScenario = null;
+  function showScenario(id) {
+    if (activeScenario === id) {
+      document.getElementById('scenario-'+id).classList.remove('show');
+      activeScenario = null;
+      return;
+    }
+    if (activeScenario) {
+      document.getElementById('scenario-'+activeScenario).classList.remove('show');
+    }
+    document.getElementById('scenario-'+id).classList.add('show');
+    activeScenario = id;
+    // scroll into view
+    setTimeout(() => {
+      document.getElementById('scenario-'+id).scrollIntoView({behavior:'smooth', block:'nearest'});
+    }, 100);
+  }
+
+  function finishCourse() {
+    modulesDone.add(4);
+    markDone(4);
+    updateProgress();
+    document.getElementById('app').classList.remove('active');
+    document.getElementById('completion').classList.add('active');
+    const now = new Date();
+    document.getElementById('cert-date').textContent = 'Behaald op ' + now.toLocaleDateString('nl-BE', {year:'numeric',month:'long',day:'numeric'});
+  }
+
+  function restartCourse() {
+    modulesDone.clear();
+    currentModule = 0;
+    document.getElementById('completion').classList.remove('active');
+    document.getElementById('app').classList.add('active');
+    document.querySelectorAll('.nav-item').forEach((n,i) => {
+      n.classList.remove('done','active');
+      if(i>0) n.classList.add('locked');
+      const chk = n.querySelector('.nav-check');
+      if(chk) chk.remove();
+      if(i>0 && !n.querySelector('.lock-icon')) {
+        const lk = document.createElement('span');
+        lk.className='lock-icon'; lk.id='lock-'+i; lk.textContent='🔒';
+        n.appendChild(lk);
+      }
+    });
+    document.querySelectorAll('.quiz-opt').forEach(o => { o.classList.remove('correct','wrong','disabled'); });
+    document.querySelectorAll('.quiz-feedback').forEach(f => { f.classList.remove('show','correct-fb','wrong-fb'); f.textContent=''; });
+    document.querySelectorAll('.quiz-next').forEach(b => b.classList.remove('show'));
+    updateProgress();
+    goModule(0);
+  }
+</script>
+</body>
+</html>
